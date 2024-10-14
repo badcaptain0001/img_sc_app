@@ -5,11 +5,11 @@ import { createStackNavigator } from "@react-navigation/stack";
 
 import { theme } from "./app/core/theme";
 import {
-  StartScreen,
   LoginScreen,
   RegisterScreen,
   ResetPasswordScreen,
   HomeScreen,
+  BottomTabs,
 } from "./app/screens";
 
 const Stack = createStackNavigator();
@@ -19,19 +19,13 @@ export default function App() {
     <Provider theme={theme}>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="StartScreen"
+          initialRouteName="LoginScreen"
           screenOptions={{
             headerShown: false,
           }}
         >
-          <Stack.Screen name="StartScreen" component={StartScreen} />
           <Stack.Screen name="LoginScreen" component={LoginScreen} />
-          <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
-          <Stack.Screen name="HomeScreen" component={HomeScreen} />
-          <Stack.Screen
-            name="ResetPasswordScreen"
-            component={ResetPasswordScreen}
-          />
+          <Stack.Screen name="Main" component={BottomTabs} />
         </Stack.Navigator>
       </NavigationContainer>
     </Provider>

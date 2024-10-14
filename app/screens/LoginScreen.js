@@ -7,73 +7,57 @@ import Logo from "../components/Logo";
 import Header from "../components/Header";
 import Button from "../components/Button";
 import TextInput from "../components/TextInput";
-import BackButton from "../components/BackButton";
 import { theme } from "../core/theme";
-import { emailValidator } from "../helpers/emailValidator";
-import { passwordValidator } from "../helpers/passwordValidator";
+import { phoneValidator } from "../helpers/phoneValidator";
+import { pinValidator } from "../helpers/pinValidator";
 
 export default function LoginScreen({ navigation }) {
-  const [email, setEmail] = useState({ value: "", error: "" });
-  const [password, setPassword] = useState({ value: "", error: "" });
+  const [phone, setPhone] = useState({ value: "", error: "" });
+  const [pin, setPin] = useState({ value: "", error: "" });
 
   const onLoginPressed = () => {
-    const emailError = emailValidator(email.value);
-    const passwordError = passwordValidator(password.value);
-    if (emailError || passwordError) {
-      setEmail({ ...email, error: emailError });
-      setPassword({ ...password, error: passwordError });
-      return;
-    }
+    // const phoneError = phoneValidator(phone.value);
+    // const pinError = pinValidator(pin.value);
+    // if (phoneError || pinError) {
+    //   setPhone({ ...phone, error: phoneError });
+    //   setPin({ ...pin, error: pinError });
+    //   return;
+    // }
     navigation.reset({
       index: 0,
-      routes: [{ name: "HomeScreen" }],
+      routes: [{ name: "Main" }],
     });
   };
 
   return (
     <Background>
-      <BackButton goBack={navigation.goBack} />
       <Logo />
-      <Header>Hello.</Header>
+      <Header>Welcome Back</Header>
       <TextInput
-        label="Email"
+        label="Phone Number"
         returnKeyType="next"
-        value={email.value}
-        onChangeText={(text) => setEmail({ value: text, error: "" })}
-        error={!!email.error}
-        errorText={email.error}
+        value={phone.value}
+        onChangeText={(text) => setPhone({ value: text, error: "" })}
+        error={!!phone.error}
+        errorText={phone.error}
         autoCapitalize="none"
-        autoCompleteType="email"
-        textContentType="emailAddress"
-        keyboardType="email-address"
+        keyboardType="phone-pad"
+        maxLength={10}
       />
       <TextInput
-        label="Password"
+        label="PIN"
         returnKeyType="done"
-        value={password.value}
-        onChangeText={(text) => setPassword({ value: text, error: "" })}
-        error={!!password.error}
-        errorText={password.error}
+        value={pin.value}
+        onChangeText={(text) => setPin({ value: text, error: "" })}
+        error={!!pin.error}
+        errorText={pin.error}
         secureTextEntry
+        keyboardType="numeric"
+        maxLength={4}
       />
-      <View style={styles.forgotPassword}>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("ResetPasswordScreen")}
-        >
-          <Text style={styles.forgot}>Forgot your password ?</Text>
-        </TouchableOpacity>
-      </View>
       <Button mode="contained" onPress={onLoginPressed}>
         Log in
       </Button>
-      <View style={styles.row}>
-        <Text>You do not have an account yet ?</Text>
-      </View>
-      <View style={styles.row}>
-        <TouchableOpacity onPress={() => navigation.replace("RegisterScreen")}>
-          <Text style={styles.link}>Create !</Text>
-        </TouchableOpacity>
-      </View>
     </Background>
   );
 }
@@ -87,6 +71,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     marginTop: 4,
+    justifyContent: "center",
   },
   forgot: {
     fontSize: 13,
@@ -95,5 +80,6 @@ const styles = StyleSheet.create({
   link: {
     fontWeight: "bold",
     color: theme.colors.primary,
+    marginLeft: 4,
   },
 });
