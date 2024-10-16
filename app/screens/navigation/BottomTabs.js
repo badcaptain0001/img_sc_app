@@ -5,6 +5,7 @@ import HomeScreen from "../HomeScreen";
 import RegisterScreen from "../RegisterScreen";
 import StartScreen from "../StartScreen";
 import Upload from "../Upload";
+import Parent from "../Parent";
 
 const Tab = createBottomTabNavigator();
 
@@ -25,8 +26,8 @@ export default function BottomTabs() {
             case "ResetPassword":
               iconName = "key-outline";
               break;
-            case "Start":
-              iconName = "rocket-outline";
+            case "Profile":
+              iconName = "person-outline";
               break;
             default:
               iconName = "ellipse-outline";
@@ -47,8 +48,8 @@ export default function BottomTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Upload" component={Upload} />
-      <Tab.Screen name="Start" component={StartScreen} />
+      <Tab.Screen name="Upload" component={Parent} />
+      <Tab.Screen name="Profile" component={StartScreen} />
     </Tab.Navigator>
   );
 }

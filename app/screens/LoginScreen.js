@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import React, { useState,useEffect } from "react";
 import { TouchableOpacity, StyleSheet, View } from "react-native";
-import { Text } from "react-native-paper";
-
+import axios from "axios";
 import Background from "../components/Background";
 import Logo from "../components/Logo";
 import Header from "../components/Header";
@@ -10,24 +9,79 @@ import TextInput from "../components/TextInput";
 import { theme } from "../core/theme";
 import { phoneValidator } from "../helpers/phoneValidator";
 import { pinValidator } from "../helpers/pinValidator";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function LoginScreen({ navigation }) {
   const [phone, setPhone] = useState({ value: "", error: "" });
   const [pin, setPin] = useState({ value: "", error: "" });
 
-  const onLoginPressed = () => {
-    // const phoneError = phoneValidator(phone.value);
-    // const pinError = pinValidator(pin.value);
-    // if (phoneError || pinError) {
-    //   setPhone({ ...phone, error: phoneError });
-    //   setPin({ ...pin, error: pinError });
-    //   return;
-    // }
-    navigation.reset({
-      index: 0,
-      routes: [{ name: "Main" }],
-    });
+  const storeData = async (value) => {
+    try {
+      const jsonValue = JSON.stringify(value);
+      await AsyncStorage.setItem('userinfo', jsonValue);
+    } catch (e) {
+      // saving error
+    }
   };
+
+  const getData = async () => {
+    try {
+      const jsonValue = await AsyncStorage.getItem('userinfo');
+      return jsonValue != null ? JSON.parse(jsonValue) : null;
+    } catch (e) {
+      // error reading value
+    }
+  };
+
+  useEffect(() => {
+    getData().then((data) => {
+      if (data) {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Main" }],
+        });
+      }
+    }
+    ).catch((error) => {
+      console.error("Error fetching data:", error);
+    });
+  }, []);
+
+  const onLoginPressed = () => {
+    const phoneError = phoneValidator(phone.value);
+    const pinError = pinValidator(pin.value);
+    if (phoneError || pinError) {
+      setPhone({ ...phone, error: phoneError });
+      setPin({ ...pin, error: pinError });
+      return;
+    }
+    const obj = {
+      phone: phone.value,
+      pin: parseInt(pin.value),
+    };
+    axios
+      .post("https://svradvertising.co.in/api/users/login", obj)
+      .then((response) => {
+        try {
+          storeData(JSON.stringify(response.data.user));
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "Main" }],
+          });
+        } catch (error) {
+          alert("Something went wrong");
+        }
+      })
+      .catch((error) => {
+        console.error("API call error:", error.response.data);
+        alert(error.response.data.message);
+      });
+  };
+
+  // navigation.reset({
+  //   index: 0,
+  //   routes: [{ name: "Main" }],
+  // });
 
   return (
     <Background>

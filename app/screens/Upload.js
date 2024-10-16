@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -8,24 +9,28 @@ import {
   Easing,
   Dimensions,
   Image,
-  Modal,
-  StatusBar,
   ScrollView,
+  StatusBar,
+  SafeAreaView,
+  Platform,
 } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
+import * as ImageManipulator from "expo-image-manipulator";
 
 const { width, height } = Dimensions.get("window");
 
-export default function Upload({ navigation }) {
+export default function Upload({ onPhotosSubmit, onBack, onLocationUpdate }) {
+  const navigation = useNavigation();
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [cameraRef, setCameraRef] = useState(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [photos, setPhotos] = useState([]);
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [rotationAngles, setRotationAngles] = useState([]);
+  const [isReviewing, setIsReviewing] = useState(false);
 
   const frameAnimation = useRef(new Animated.Value(0)).current;
   const buttonAnimation = useRef(new Animated.Value(0)).current;
@@ -42,9 +47,9 @@ export default function Upload({ navigation }) {
       setErrorMsg("Permission to access location was denied");
       return;
     }
-
-    let location = await Location.getCurrentPositionAsync({});
-    setLocation(location);
+    let loc = await Location.getCurrentPositionAsync({});
+    onLocationUpdate(loc.coords.latitude, loc.coords.longitude);
+    setLocation(loc);
   };
 
   const animateFrame = () => {
@@ -97,42 +102,115 @@ export default function Upload({ navigation }) {
 
   if (!permission || !permission.granted) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" />
-        <Text style={styles.message}>We need your permission to use the camera</Text>
-        <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
+        <Text style={styles.message}>
+          We need your permission to use the camera
+        </Text>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={requestPermission}
+        >
           <Text style={styles.permissionButtonText}>Grant Permission</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   const takePicture = async () => {
     if (cameraRef && isCameraReady) {
-      const photo = await cameraRef.takePictureAsync({ quality: 0.8 });
-      setPhotos([...photos, photo]);
+      const photo = await cameraRef.takePictureAsync({ quality: 0.8, exif: true });
+      const angle = Platform.OS === "ios" ? 270 : 180; // Rotate by 270 degrees on iOS and 180 degrees on Android
+      let manipulatedPhoto = await ImageManipulator.manipulateAsync(
+        photo.uri,
+        [{ rotate: angle }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      setPhotos([...photos, manipulatedPhoto]);
+      setRotationAngles([...rotationAngles, 270]); // Initialize rotation angle to 270
       if (photos.length + 1 >= 4) {
-        setIsModalVisible(true);
+        setIsReviewing(true);
       }
     }
   };
 
   const retakePicture = (index) => {
     const newPhotos = photos.filter((_, i) => i !== index);
+    const newRotationAngles = rotationAngles.filter((_, i) => i !== index);
     setPhotos(newPhotos);
-    setIsModalVisible(false);
+    setRotationAngles(newRotationAngles);
+    if (newPhotos.length < 4) {
+      setIsReviewing(false);
+    }
+  };
+
+  const rotateImage = async (index) => {
+    const photo = photos[index];
+    const currentAngle = rotationAngles[index];
+    const newAngle = (currentAngle + 90) % 360; // Rotate by 90 degrees each time
+
+    const rotatedPhoto = await ImageManipulator.manipulateAsync(
+      photo.uri,
+      [{ rotate: 90 }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
+    const newPhotos = [...photos];
+    newPhotos[index] = rotatedPhoto;
+
+    const newRotationAngles = [...rotationAngles];
+    newRotationAngles[index] = newAngle;
+    console.log(newRotationAngles);
+
+    setPhotos(newPhotos);
+    setRotationAngles(newRotationAngles);
   };
 
   const savePictures = () => {
-    console.log("Photos saved:", photos);
-    // Handle the photos (e.g., upload them)
-    setIsModalVisible(false);
-    // Navigate to the next screen or show a success message
-    navigation.navigate("UploadSuccess", { photos });
+    onPhotosSubmit(photos);
   };
 
+  if (isReviewing) {
+    return (
+      <SafeAreaView style={styles.reviewContainer}>
+        <ScrollView contentContainerStyle={styles.reviewScrollContent}>
+          {photos.map((photo, index) => (
+            <View key={index} style={styles.reviewPhotoContainer}>
+              <Image source={{ uri: photo.uri }} style={styles.reviewImage} />
+              <View style={styles.reviewButtons}>
+                <TouchableOpacity
+                  style={styles.retakeButton}
+                  onPress={() => retakePicture(index)}
+                >
+                  <Ionicons name="refresh-outline" size={24} color="white" />
+                  <Text style={styles.retakeText}>Retake</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.rotateButton}
+                  onPress={() => rotateImage(index)}
+                >
+                  <Ionicons name="sync-outline" size={24} color="white" />
+                  <Text style={styles.rotateText}>Rotate</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+        <View style={styles.reviewButtonsContainer}>
+          <TouchableOpacity style={styles.submitButton} onPress={savePictures}>
+            <Text style={styles.submitText}>Submit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.backButton} onPress={onBack}>
+            <Text style={styles.backText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <CameraView
         style={styles.camera}
@@ -140,56 +218,52 @@ export default function Upload({ navigation }) {
         ref={(ref) => setCameraRef(ref)}
         onCameraReady={() => setIsCameraReady(true)}
       >
-        <Animated.View style={[styles.frame, { transform: [{ scale: frameScale }] }]}>
+        <Animated.View
+          style={[styles.frame, { transform: [{ scale: frameScale }] }]}
+        >
           <Text style={styles.frameText}>Frame</Text>
         </Animated.View>
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={onBack}
+          >
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
           <View style={styles.cameraInfo}>
             <Ionicons name="location" size={18} color="white" />
             <Text style={styles.locationText}>
-              {location ? `${location.coords.latitude.toFixed(2)}, ${location.coords.longitude.toFixed(2)}` : "Locating..."}
+              {location
+                ? `${location.coords.latitude.toFixed(2)}, ${location.coords.longitude.toFixed(2)}`
+                : "Locating..."}
             </Text>
           </View>
         </View>
+        <View style={styles.photoCountContainer}>
+          <Text style={styles.photoCountText}>
+            {photos.length} / 4 Photos
+          </Text>
+        </View>
+        <ScrollView horizontal style={styles.thumbnailContainer}>
+          {photos.map((photo, index) => (
+            <Image
+              key={index}
+              source={{ uri: photo.uri }}
+              style={styles.thumbnail}
+            />
+          ))}
+        </ScrollView>
         <View style={styles.bottomBar}>
-          <Animated.View style={[styles.buttonContainer, { transform: [{ scale: buttonScale }] }]}>
+          <Animated.View
+            style={[styles.buttonContainer, { transform: [{ scale: buttonScale }] }]}
+          >
             <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
               <View style={styles.captureButtonInner} />
             </TouchableOpacity>
           </Animated.View>
         </View>
       </CameraView>
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={isModalVisible}
-        onRequestClose={() => setIsModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            {photos.map((photo, index) => (
-              <View key={index} style={styles.photoContainer}>
-                <Image source={{ uri: photo.uri }} style={styles.previewImage} />
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={[styles.modalButton, styles.retakeButton]} onPress={() => retakePicture(index)}>
-                    <Ionicons name="refresh-outline" size={24} color="white" />
-                    <Text style={styles.modalButtonText}>Retake</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))}
-            <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={savePictures}>
-              <Ionicons name="checkmark-outline" size={24} color="white" />
-              <Text style={styles.modalButtonText}>Save All</Text>
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -206,10 +280,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingTop: 40,
-  },
-  backButton: {
-    padding: 10,
+    paddingTop: 10,
   },
   cameraInfo: {
     flexDirection: "row",
@@ -226,28 +297,25 @@ const styles = StyleSheet.create({
   },
   frame: {
     position: "absolute",
-    top: height * 0.1,
+    top: height * 0.05,
     left: width * 0.05,
     right: width * 0.05,
-    bottom: height * 0.1,
+    bottom: height * 0.17,
     borderWidth: 2,
-    borderColor: "rgba(255, 255, 255)",
+    borderColor: "rgba(255, 255, 255, 0.8)",
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
   frameText: {
     color: "white",
-    opacity: 0.7,
-    fontSize: 24,
-    fontWeight: "bold",
+    fontSize: 20,
     textTransform: "uppercase",
-    letterSpacing: 2,
-    transform: [{ rotate: "90deg" }],
+    opacity: 0.7,
   },
   bottomBar: {
     position: "absolute",
-    bottom: 5,
+    bottom: 10,
     left: 0,
     right: 0,
     alignItems: "center",
@@ -259,7 +327,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    backgroundColor: "rgba(255, 255, 255, 0.4)",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -269,68 +337,106 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: "white",
   },
-  message: {
-    textAlign: "center",
+  photoCountContainer: {
+    position: "absolute",
+    bottom: 30,
+    left: 20,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    padding: 10,
+    borderRadius: 15,
+  },
+  photoCountText: {
+    color: "white",
+    fontSize: 16,
+  },
+  thumbnailContainer: {
+    position: "absolute",
+    bottom: 80,
+    right: 20,
+    flexDirection: "row",
+  },
+  thumbnail: {
+    width: 50,
+    height: 50,
+    marginLeft: 5,
+    borderRadius: 5,
+  },
+  reviewContainer: {
+    flex: 1,
+    backgroundColor: "black",
+  },
+  reviewScrollContent: {
+    padding: 20,
+  },
+  reviewPhotoContainer: {
+    marginBottom: 20,
+  },
+  reviewImage: {
+    width: "100%",
+    height: 200,
+    borderRadius: 10,
+  },
+  reviewButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  retakeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  retakeText: {
+    color: "white",
+    marginLeft: 5,
+  },
+  rotateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  rotateText: {
+    color: "white",
+    marginLeft: 5,
+  },
+  reviewButtonsContainer: {
+    padding: 20,
+  },
+  submitButton: {
+    backgroundColor: "#28a745",
+    padding: 15,
+    borderRadius: 5,
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  submitText: {
     color: "white",
     fontSize: 18,
-    marginBottom: 20,
-    marginTop: 50,
+  },
+  backButton: {
+    alignItems: "center",
+  },
+  backText: {
+    color: "white",
+    fontSize: 18,
   },
   permissionButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 25,
-    alignSelf: "center",
+    backgroundColor: "#007bff",
+    padding: 15,
+    borderRadius: 5,
+    marginHorizontal: 20,
   },
   permissionButtonText: {
     color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 18,
+    textAlign: "center",
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.8)",
-  },
-  modalContent: {
-    alignItems: "center",
-    width: width * 0.9,
-  },
-  photoContainer: {
-    marginBottom: 20,
-  },
-  previewImage: {
-    width: width * 0.8,
-    height: height * 0.5,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-  },
-  modalButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 25,
-    marginHorizontal: 10,
-  },
-  retakeButton: {
-    backgroundColor: "#FF4136",
-  },
-  saveButton: {
-    backgroundColor: "#2ECC40",
-    marginTop: 20,
-  },
-  modalButtonText: {
+  message: {
     color: "white",
-    fontSize: 16,
-    fontWeight: "bold",
-    marginLeft: 8,
+    fontSize: 20,
+    textAlign: "center",
+    marginTop: 20,
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
 });
