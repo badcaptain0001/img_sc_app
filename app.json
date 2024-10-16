@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Exlogrn",
-    "slug": "Exlogrn",
-    "version": "2.0.0",
+    "name": "SVR Advertising",
+    "slug": "svr-advertising",
+    "version": "2.0.1",
     "orientation": "portrait",
     "icon": "./assets/app.png",
     "userInterfaceStyle": "light",
@@ -12,19 +12,20 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true,
-      "config": {
-        "googleMapsApiKey": "AIzaSyAfssjDeBK4IVUhtopOWqXHmseWkjouBoY"
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/app.png",
         "backgroundColor": "#ffffff"
       },
-      "config": {
-        "googleMapsApiKey": "AIzaSyAfssjDeBK4IVUhtopOWqXHmseWkjouBoY"
-      }
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.psrishabh0001.svradvertising"
     },
     "web": {
       "favicon": "./assets/app.png"
@@ -44,6 +45,16 @@
           "recordAudioAndroid": true
         }
       ]
-    ]
+    ],
+    "assets": [
+      "./assets/app.png",
+      "./assets/splash.png",
+      "./assets/items"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "a01318c4-baec-4af9-a230-8155caae998c"
+      }
+    }
   }
 }
